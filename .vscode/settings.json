@@ -1,0 +1,23 @@
+// Copyright (C) 2023 Jonah 'Jay' Yolles-Murphy (@TG-Techie)
+// this file is licensed under the MIT License, see the project root.
+{
+    "python.languageServer": "Pylance",
+    "python.linting.mypyEnabled": false,
+    "python.analysis.autoImportCompletions": false,
+    "python.analysis.autoImportUserSymbols": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.typeCheckingMode": "strict",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUnusedImport": "information",
+        "reportUnusedVariable": "warning",
+        "reportUnusedFunction": "warning",
+        "reportUnusedExpression": "warning",
+    },
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "88"
+    ]
+}
