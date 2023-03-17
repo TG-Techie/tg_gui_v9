@@ -8,22 +8,6 @@ from tg_gui.prelude import *
 from tg_gui import Text, Group
 from tg_gui import text
 
-if TYPE_CHECKING:
-    from typing import Any, Generator
-
-# print(Group, text, Text)
-import time
-
-
-class Sleep:
-    def __await__(self) -> Generator[Any, None, Any]:
-        yield
-
-
-async def foo():
-    x = Sleep()
-    await x
-
 
 class Build(Widget):
     foo: int = State(required=True)
