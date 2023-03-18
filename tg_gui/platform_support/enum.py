@@ -24,7 +24,6 @@ class Enum:
         return f"<{self.__class__.__name__}.{self._name}: {repr(self.value)}{' (auto)' if self._from_auto else ''}>"
 
     def __init_subclass__(cls) -> None:
-
         # increment so auto numbers are all greater than the value in the class body
         # this is not standards complicant but should do the trick
         int_values: tuple[int, ...] = tuple(
@@ -50,7 +49,7 @@ class Enum:
             gc.collect()
 
     def __eq__(self, other: Self) -> bool:
-        return self.value == other.value
+        return other.__class__ is self.__class__ and self.value == other.value
 
 
 class auto:

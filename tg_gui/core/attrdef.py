@@ -25,7 +25,6 @@ from enum import Enum, auto
 T = TypeVar("T")
 
 if TYPE_CHECKING:
-
     from typing import TypeGuard, Any, Literal, overload, Callable
 
     from .widget import Widget
@@ -37,20 +36,18 @@ class InitKind(Enum):
     default_factory = auto()
 
 
-def isstatedef(o: Any | State[Any]) -> TypeGuard[State[Any]]:
-    return isinstance(o, State)
+def isattrdef(o: Any | AttrDef[Any]) -> TypeGuard[AttrDef[Any]]:
+    return isinstance(o, AttrDef)
 
 
-# TODO: split this into argattr(...), state(...), constattr(...)
-
-
-class State(Generic[T]):
+class AttrDef(Generic[T]):
     uid: UID
     name: str
     owning_type: type[Widget]
     _in_init: bool = False
     _default: Maybe[T] = Missing
     _default_factory: Maybe[Callable[[], T]] = Missing
+    _private_id: str
 
     @property
     def init_kind(self) -> InitKind:
@@ -68,12 +65,13 @@ class State(Generic[T]):
     def __set_name__(self, owner: type[Widget], name: str) -> None:
         self.name = name
         self.owning_type = owner
+        self._private_id = f":{self.name}"
 
     def __get__(self, inst: Widget, iscls: type[Widget] | None) -> T:
-        return getattr(inst, f":{self.name}")
+        return getattr(inst, self._private_id)
 
     def __set__(self, inst: Widget, value: T) -> None:
-        return setattr(inst, f":{self.name}", value)
+        setattr(inst, self._private_id, value)
 
     def init(self, inst: Widget, value: Maybe[T] = Missing) -> None:
         if ismissing(value):
@@ -92,11 +90,7 @@ class State(Generic[T]):
         assert isnotmissing(value)
         self.__set__(inst, value)
 
-    def bind(self, *_: Any, **__: Any) -> None:  # -> Binding[T]:
-        raise NotImplementedError
-
     if TYPE_CHECKING:
-
         # FUTURE: add __new__ overloads to specialize State into SequenceState and MappingState as needed
 
         @overload
@@ -164,7 +158,6 @@ class State(Generic[T]):
             required: Maybe[Literal[True]] = Missing,
             init: Maybe[bool] = Missing,
         ) -> None:
-
             if isnotmissing(required):
                 assert ismissing(default)
                 assert ismissing(default_factory)

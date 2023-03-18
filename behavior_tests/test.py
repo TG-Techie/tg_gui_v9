@@ -8,7 +8,7 @@ class Text(Widget):
     label: str = State(required=True, init=True)
     font: str = State(default="menlo", init=True)
 
-    Body[Self](lambda self: self)
+    body = Body[Self](lambda self: self)
 
 
 class SubclassedText(Text):

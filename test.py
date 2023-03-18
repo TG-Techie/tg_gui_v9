@@ -10,8 +10,8 @@ from tg_gui import text
 
 
 class Build(Widget):
-    foo: int = State(required=True)
-    bar: int = State(default=3, init=True)
+    foo: int = AttrDef(required=True)
+    bar: int = AttrDef(default=3, init=True)
 
     @Body
     def body(self):
@@ -19,13 +19,13 @@ class Build(Widget):
 
 
 class BuildTwo(Build):
-    foo: int = State(default=5, init=True)
+    foo: int = AttrDef(default=5, init=True)
 
 
 class Main(Widget):
-    items = State(default_factory=list[str])
+    items = AttrDef(default_factory=list[str])
 
-    Body[Self](lambda self: Group())
+    body = Body[Self](lambda self: Group())
 
 
 main(Main)

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from ..platform_support import runtime_typing
+from ..platform_support import runtime_typing, cleanup_typing_artifacts
 
 from enum import Enum
 
@@ -35,14 +35,10 @@ if TYPE_CHECKING or runtime_typing():
         "runtime_typing",
     )
 
-else:
-    abstractproperty = property
-
-
-class _Identifiable(Protocol):
-    @abstractproperty
-    def uid(self) -> "UID":
-        ...
+    class _Identifiable(Protocol):
+        @abstractproperty
+        def uid(self) -> "UID":
+            ...
 
 
 if TYPE_CHECKING or runtime_typing():
@@ -50,9 +46,11 @@ if TYPE_CHECKING or runtime_typing():
 else:
     UID = int
 
-from random import randint as _randint
+# randomize the start value for the uid
+from ..platform_support import random_base_uid as _UID_BASE
 
-__next_uid = UID(_randint(0, 10))
+__next_uid = UID(_UID_BASE)
+del _UID_BASE
 
 
 def uid() -> UID:
@@ -94,3 +92,6 @@ if TYPE_CHECKING:
     Maybe = T | MissingType
 else:
     Maybe = object
+
+
+cleanup_typing_artifacts(locals())

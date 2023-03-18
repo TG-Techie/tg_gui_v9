@@ -7,7 +7,7 @@ from __future__ import annotations
 # pyright: reportUnusedImport=false
 from typing import TYPE_CHECKING, Self
 
-from .core import Widget, State, Body
+from .core import Widget, AttrDef, Body
 from ._proto_main import main
 
 # --- end exports ---

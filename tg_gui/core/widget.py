@@ -2,20 +2,19 @@
 # this file is licensed under the MIT License, see the project root.
 
 from __future__ import annotations
+from ..platform_support import typing_standin, cleanup_typing_artifacts
 
 from .shared import UID, uid, by_uid, runtime_typing, Missing, ismissing
 
-from .state import InitKind, isstatedef
+from .attrdef import InitKind, isattrdef
 
 # pyright: reportImportCycles=false
 
-from typing import TYPE_CHECKING, TypeVar, Generic, Self
+from typing import TYPE_CHECKING, TypeVar, Generic, Self, Protocol, dataclass_transform
 
 if TYPE_CHECKING or runtime_typing():
     from typing import (
         TYPE_CHECKING,
-        dataclass_transform,
-        Protocol,
         Any,
         ClassVar,
         Callable,
@@ -27,21 +26,17 @@ if TYPE_CHECKING or runtime_typing():
 
     __all__ = ("Widget", "Body")
 
-else:
-    ABC = object
-    Protocol = object
-    abstractproperty = property
-    abstractmethod = lambda fn: fn
-    dataclass_transform = lambda *_, **__: (lambda o: o)  # type: ignore
-
 
 T = TypeVar("T")
-W = TypeVar("W", bound="Widget", contravariant=True)
 Ws = TypeVar("Ws", bound="Widget")
+Wco = TypeVar("Wco", bound="Widget", contravariant=True)
+
 
 if TYPE_CHECKING:
-
-    class _AttrSpec(Protocol):
+    # here we use an _AttrSpec protocol so subclasses of AttrDef can be used (like State)
+    # without having to modify the Widget base class.
+    # ALL uses
+    class _AttrDefAndSubclasses(Protocol):
         uid: UID
         name: str
 
@@ -59,52 +54,31 @@ if TYPE_CHECKING:
         # def init(self, inst: Widget, value: Any = Missing):
         #     ...
 
-    _BodyCallable = Callable[[W], "Widget"]
+    _BodyCallable = Callable[[Wco], "Widget"]
 else:
-    _AttrSpec = object
+    _AttrDefAndSubclasses = typing_standin
 
 
-class _BodyDef(Generic[W]):
+class _BodyDef(Generic[Wco]):
     """
     sugar used to have type-safe inferred declaration of lambdas for the body method of
     Widget classes.
     ```
     body = Body[Self](lambda self: text...)
-    - OR -
-    Body[Self](lambda self: text...)
     ```
     """
 
-    _methods_by_module: dict[str, _BodyCallable[W]] = {}
-
     @classmethod
-    def __call__(cls, method: Callable[[W], Ws]) -> Callable[[W], Ws]:
-        # caches the methods in this object, only one class per module can use this syntax as a time
-
-        owning_modname: str = method.__globals__["__name__"]
-
-        # check if there is alreay a method being constructed in a specific module,
-        # if not set the entry for the module
-        was_already_set = method is not cls._methods_by_module.setdefault(
-            owning_modname, method
-        )
-        if was_already_set:
-            raise ValueError(
-                f"a Widget class is already being constructed in module {repr(owning_modname)}"
-            )
-
+    def __call__(cls, method: Callable[[Wco], Ws]) -> Callable[[Wco], Ws]:
         return method
 
     def __getitem__(self, type: type[Ws]) -> _BodyDef[Ws]:
-        assert self is Body
+        assert self is Body, "Body should be a singleton"
         return Body
-
-    @classmethod
-    def widget_get_body_method(cls, widcls: type[W]) -> _BodyCallable[W] | None:
-        return cls._methods_by_module.pop(widcls.__module__, None)
 
 
 Body: _BodyDef[Any] = _BodyDef()
+_BodyDef.__new__ = NotImplemented
 del _BodyDef
 
 
@@ -112,18 +86,20 @@ del _BodyDef
     eq_default=False,
     order_default=False,
     kw_only_default=False,
-    field_specifiers=(_AttrSpec,),
+    field_specifiers=(_AttrDefAndSubclasses,),
 )
 class Widget:
     uid: UID
 
-    state_modified: bool  # TODO: evaluate if this is how state updating will happend
     # body: ClassVar[Callable[[W], Ws]] = None  # type: ignore
     if not TYPE_CHECKING:
         body = None
 
-    _arg_specs_: ClassVar[tuple[_AttrSpec, ...]] = ()
-    _attr_specs_: ClassVar[dict[str, _AttrSpec]] = {}
+    _arg_specs_: ClassVar[tuple[_AttrDefAndSubclasses, ...]] = ()
+    _attr_specs_: ClassVar[dict[str, _AttrDefAndSubclasses]] = {}
+
+    # def __matmul__(self, transform: Callable[[Self], Self]) -> Self:
+    #     pass
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.uid = uid()
@@ -133,16 +109,17 @@ class Widget:
         assert Missing not in kwargs.values()
 
         # input sanitization
-        if __debug__ and len(args) > len(specs):
-            raise TypeError(
-                f"{self.__class__.__name__}(...) takes up to {len(specs)} positional "
-                + f"arguments ({len(args)} given)"
-            )
-        if __debug__ and len(kwargs) > (len(specs) - len(args)):
-            raise TypeError(
-                f"{self.__class__.__name__}(...) called with {len(kwargs)} keyword "
-                + f"arguments, takes up to {len(specs)} total arguments"
-            )
+        if __debug__:
+            if len(args) > len(specs):
+                raise TypeError(
+                    f"{self.__class__.__name__}(...) takes up to {len(specs)} positional "
+                    + f"arguments ({len(args)} given)"
+                )
+            elif len(kwargs) > (len(specs) - len(args)):
+                raise TypeError(
+                    f"{self.__class__.__name__}(...) called with {len(kwargs)} keyword "
+                    + f"arguments, takes up to {len(specs)} total arguments"
+                )
 
         # future: integrate the two below loops
         n_args = len(args)
@@ -184,28 +161,19 @@ class Widget:
     def __init_subclass__(cls: type[Widget]) -> None:
         # --- body attr ---
         # for typing ease, the user can define the body propery using
-        # `body[Self](lambda: ...)` syntax
-        bodyattr = Body.widget_get_body_method(cls)
+        # `body = Body[Self](lambda: ...)` syntax
 
-        if (
-            "body" not in cls.__dict__ and getattr(cls, "body") is None
-        ):  # pyright: reportUnnecessaryComparison=false
-            assert bodyattr is not None, (
-                f"{cls} missing definition for the body method, use "
-                + "`body[Self](lambda self: ...)` syntax"
-            )
-            setattr(cls, "body", bodyattr)
-        else:
-            assert (  # None = not defined in the body
-                bodyattr is None or bodyattr is getattr(cls, "body")
-            ), (f"conflicting definitions for {cls}")
+        # assert "body" in cls.__dict__, "body must be defined"
+        assert (
+            getattr(cls, "body", None) is not None
+        ), "body must be defined in the class declaration or a parent class"
 
         # --- attributes and arguemnts ---
         # climb the base classes and determine arg order
 
-        attr_specs: dict[str, _AttrSpec] = {}
-        new_specs: dict[str, _AttrSpec] = {
-            name: spec for name, spec in cls.__dict__.items() if isstatedef(spec)
+        attr_specs: dict[str, _AttrDefAndSubclasses] = {}
+        new_specs: dict[str, _AttrDefAndSubclasses] = {
+            name: spec for name, spec in cls.__dict__.items() if isattrdef(spec)
         }
 
         for basecls in reversed(cls.__bases__):
@@ -237,5 +205,8 @@ class Widget:
         def __new__(cls, *_: Any, **__: Any) -> Self:
             assert (
                 cls is not Widget
-            ), "cannot create an instance of the Widget class, use a subclass"
+            ), "cannot create an instance of the Widget baseclass class, use a subclass"
             return object.__new__(cls)
+
+
+cleanup_typing_artifacts(locals())

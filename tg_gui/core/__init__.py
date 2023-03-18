@@ -3,5 +3,5 @@
 
 # pyright: reportUnusedImport=false
 from .shared import UID, uid, by_uid, Maybe, Missing, MissingType
-from .state import State
+from .attrdef import AttrDef
 from .widget import Widget, Body

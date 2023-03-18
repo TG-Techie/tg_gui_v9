@@ -4,14 +4,15 @@
 # intentionally excluding `from __future__ import annotations`
 
 # --- cpython compat ---
-# in on circuitpython, importing this first will patch the runtime to closer to cpython compatible, as needed
+# in on circuitpython, importing this first will patch the runtime closer to cpython compatible, as needed
 from . import platform_support as _
 
 from .platform_support import runtime_typing as _runtime_typing
 import sys as _sys
 
+
 # --- versioning and (runtime) linting ---
-# patch in a version of time that warns about time.sleep
+# add some import warnings regarding future async compatiblity issues
 from . import _async_prep as _
 
 
@@ -22,10 +23,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
 
-# ----------------------------------
+# --- lazy module evaluation ---
 
-
-__module_exports: dict[str, str | tuple[None, "Any"]] = {
+__module_exports: dict[str, str | tuple["Any"]] = {
     # unimported = "<the module name>"
     # imported = (<the object to return>,) # in a tuple
     "Text": "text",
@@ -47,7 +47,7 @@ def __getattr__(name: str) -> "Any":
         raise AttributeError(*args)
 
     if isinstance(pack, tuple):  # than it has already been imported
-        _, obj = pack
+        (obj,) = pack
         return obj
     else:  # import it and then cache it
         # obj = getattr(__import__(f"{__name__}.{pack}"), name)
@@ -58,8 +58,8 @@ def __getattr__(name: str) -> "Any":
         # a rule of thumb check that builtins have not been messed with
         assert "builtin" not in _sys.modules
 
-        # due to incompatibility issues this is the best balance between the options
+        # due to incompatibility issues this is the best balance to import
         exec(f"from .{pack} import {name}")
 
-        __module_exports[name] = (None, locals()[name])
+        __module_exports[name] = (locals()[name],)
         return obj

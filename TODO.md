@@ -1,0 +1,3 @@
+- [ ] make `body =` a widget definition requirement
+- [ ] Explore making Widget{Thingy} and turn subclassing Widget into an @widget transform. make a widget without a baseclass possible
+- [ ] Explore widget transforms via the @ operator Text("Hello")@centered
